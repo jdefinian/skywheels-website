@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 import { ArrowRight, Wrench, Gauge, ShieldCheck, Menu, X, Upload, LockKeyhole, Trash2, Check, XCircle, Phone, MapPin, Clock, ChevronDown, ImagePlus, LogOut } from 'lucide-react';
-import './styles.css';
+import './styles.css?v=3';
 
 const LOGO_URL = 'https://i.postimg.cc/xCpRKkKx/d5a0e7fe-0b5f-4e47-9069-1714a645ffd1-Picsart-Background-Remover.png';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -183,7 +183,7 @@ function Submit({ onSubmit, busy, configured }) {
     <form className="form-card" onSubmit={onSubmit}>
       <div className="form-heading"><h3>Vehicle submission</h3><span>All fields marked * are required</span></div>
       {!configured && <p className="setup-warning">The site owner must connect the database before submissions can be received.</p>}
-      <div className="form-grid"><label>Your name *<input name="customer_name" required maxLength="80" placeholder="Your full name"/></label><label>Vehicle make & model *<input name="make_model" required maxLength="100" placeholder="e.g. BMW M3"/></label><label>Year (optional)<input name="year" type="number" min="1900" max="2100" placeholder="e.g. 2022"/></label><label className="full">Tell us about your vehicle<textarea name="description" rows="4" maxLength="700" placeholder="A little about your car..."/></label><label className="full upload-label"><span>Vehicle photographs * <small>Up to 5 images, 8MB each</small></span><input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required/><span className="upload-hint"><Upload/> Choose photographs from your device</span></label></div>
+      <div className="form-grid"><label>Your name *<input name="customer_name" required maxLength="80" placeholder=""/></label><label>Vehicle make & model *<input name="make_model" required maxLength="100" placeholder=""/></label><label>Year (optional)<input name="year" type="number" min="1900" max="2100" placeholder=""/></label><label className="full">Tell us about your vehicle<textarea name="description" rows="4" maxLength="700" placeholder=""/></label><label className="full upload-label"><span>Vehicle photographs * <small>Up to 5 images, 8MB each</small></span><input name="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required/><span className="upload-hint"><Upload/> Choose photographs from your device</span></label></div>
       <label className="consent"><input type="checkbox" required/> I confirm I have permission to submit these photographs and agree that approved images and vehicle details may be displayed in the Skywheels public gallery.</label>
       <button className="button primary submit-button" disabled={busy || !configured}>{busy ? 'Sending submission…' : 'Send for approval'} <ArrowRight size={17}/></button>
       <p className="privacy-note">Please do not include personal details, number plates or images you do not have permission to share.</p>

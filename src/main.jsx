@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 import { ArrowRight, Wrench, Gauge, ShieldCheck, Menu, X, Upload, LockKeyhole, Trash2, Check, XCircle, Phone, MapPin, Clock, ChevronDown, ImagePlus, LogOut } from 'lucide-react';
-import './styles.css';
+import './styles.css?v=3';
 
 const LOGO_URL = 'https://i.postimg.cc/xCpRKkKx/d5a0e7fe-0b5f-4e47-9069-1714a645ffd1-Picsart-Background-Remover.png';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

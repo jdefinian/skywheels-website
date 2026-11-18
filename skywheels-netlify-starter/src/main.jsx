@@ -1,3 +1,133 @@
+import React, { useEffect, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { createClient } from '@supabase/supabase-js';
+import { ArrowRight, Wrench, Gauge, ShieldCheck, Menu, X, Upload, LockKeyhole, Trash2, Check, XCircle, Phone, MapPin, Clock, ChevronDown, ImagePlus, LogOut } from 'lucide-react';
+import './styles.css?v=3';
+
+const LOGO_URL = 'https://i.postimg.cc/xCpRKkKx/d5a0e7fe-0b5f-4e47-9069-1714a645ffd1-Picsart-Background-Remover.png';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
+const staff = [
+  { name: 'Employee name', role: 'Mechanic', phone: '00000 000000', image: '' },
+  { name: 'Employee name', role: 'Service team', phone: '00000 000000', image: '' }
+];
+
+function App() {
+  const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [page, setPage] = useState('home');
+  const [notice, setNotice] = useState('');
+  const [session, setSession] = useState(null);
+  const [pending, setPending] = useState([]);
+  const [published, setPublished] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 850);
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => setSession(data.session));
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+      return () => { clearTimeout(timer); listener.subscription.unsubscribe(); };
+    }
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => { loadGallery(); }, [session, page]);
+
+  async function loadGallery() {
+    if (!supabase) return;
+    const { data: live } = await supabase.from('vehicles').select('*').eq('status', 'approved').order('created_at', { ascending: false });
+    if (live) {
+      const withImages = await Promise.all(live.map(async v => {
+        const firstPath = v.photo_paths?.[0];
+        if (!firstPath) return { ...v, imageUrl: null };
+        const { data } = await supabase.storage.from('vehicle-photos').createSignedUrl(firstPath, 3600);
+        return { ...v, imageUrl: data?.signedUrl || null };
+      }));
+      setPublished(withImages);
+    }
+    if (session) {
+      const { data: waiting } = await supabase.from('vehicles').select('*').eq('status', 'pending').order('created_at', { ascending: true });
+      setPending(waiting || []);
+    }
+  }
+
+  function go(to) { setPage(to); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  async function copyPhone(phone) {
+    try { await navigator.clipboard.writeText(phone); setNotice('Phone number copied to clipboard'); }
+    catch { setNotice('Please copy this number: ' + phone); }
+    setTimeout(() => setNotice(''), 2600);
+  }
+
+  async function submitVehicle(e) {
+    e.preventDefault();
+    if (!supabase) return setNotice('Website setup is not complete yet. Please try again later.');
+    const form = new FormData(e.currentTarget);
+    const files = Array.from(form.getAll('photos')).filter(f => f && f.size);
+    if (!files.length) return setNotice('Please add at least one photograph.');
+    if (files.length > 5) return setNotice('Please upload no more than five photographs.');
+    if (files.some(f => !f.type.startsWith('image/') || f.size > 8 * 1024 * 1024)) return setNotice('Images must be JPG, PNG or WebP and under 8MB each.');
+    setSubmitting(true);
+    try {
+      // Create the ID in the browser so the anonymous visitor does not need
+      // permission to read their pending row back from the database.
+      const vehicleId = crypto.randomUUID();
+      const paths = [];
+      for (const file of files) {
+        const path = `${vehicleId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+        const { error: uploadError } = await supabase.storage.from('vehicle-photos').upload(path, file, { contentType: file.type, upsert: false });
+        if (uploadError) throw uploadError;
+        paths.push(path);
+      }
+      const { error } = await supabase.from('vehicles').insert({
+        id: vehicleId,
+        customer_name: form.get('customer_name').trim(),
+        vehicle_make_model: form.get('make_model').trim(),
+        vehicle_year: form.get('year') || null,
+        description: form.get('description').trim(),
+        status: 'pending',
+        photo_paths: paths
+      });
+      if (error) throw error;
+      e.currentTarget.reset();
+      setNotice('Thanks! Your vehicle has been submitted and will appear after manager approval.');
+    } catch (err) {
+      setNotice(err.message || 'Sorry, your submission could not be sent.');
+    } finally { setSubmitting(false); setTimeout(() => setNotice(''), 6000); }
+  }
+
+  async function signIn(e) {
+    e.preventDefault();
+    if (!supabase) return setNotice('Connect Supabase first. See the setup guide.');
+    const f = new FormData(e.currentTarget);
+    setLoginBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manager-login', {
+        body: { username: f.get('username'), password: f.get('password') }
+      });
+      if (error || !data?.access_token || !data?.refresh_token) throw error || new Error('Login failed');
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token
+      });
+      if (sessionError) throw sessionError;
+      setNotice('Manager signed in');
+      go('manager');
+    } catch {
+      setNotice('Login failed. Check the manager username and password.');
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  async function moderate(id, status) {
+    const { error } = await supabase.from('vehicles').update({ status }).eq('id', id);
+    if (!error) { setNotice(status === 'approved' ? 'Vehicle approved' : 'Submission rejected'); loadGallery(); }
+    else setNotice(error.message);
+    setTimeout(() => setNotice(''), 3000);
   }
   async function removeVehicle(id) {
     if (!window.confirm('Permanently delete this vehicle and its uploaded photos?')) return;

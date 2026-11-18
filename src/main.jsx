@@ -44,8 +44,8 @@ function App() {
       const withImages = await Promise.all(live.map(async v => {
         const firstPath = v.photo_paths?.[0];
         if (!firstPath) return { ...v, imageUrl: null };
-        const { data } = await supabase.storage.from('vehicle-photos').createSignedUrl(firstPath, 3600);
-        return { ...v, imageUrl: data?.signedUrl || null };
+        const { data } = supabase.storage.from('vehicle-photos').getPublicUrl(firstPath);
+return { ...v, imageUrl: data?.publicUrl || null };
       }));
       setPublished(withImages);
     }
@@ -82,15 +82,15 @@ function App() {
         if (uploadError) throw uploadError;
         paths.push(path);
       }
-      const { error } = await supabase.from('vehicles').insert({
-        id: vehicleId,
-        customer_name: form.get('customer_name').trim(),
-        vehicle_make_model: form.get('make_model').trim(),
-        vehicle_year: form.get('year') || null,
-        description: form.get('description').trim(),
-        status: 'pending',
-        photo_paths: paths
-      });
+const { error } = await supabase.from('vehicles').insert({
+  id: vehicleId,
+  customer_name: form.get('customer_name').trim(),
+  vehicle_make_model: form.get('make_model').trim(),
+  vehicle_year: form.get('year') || null,
+  description: form.get('description').trim(),
+  status: 'pending',
+  photo_paths: paths
+});
       if (error) throw error;
       e.currentTarget.reset();
       setNotice('Thanks! Your vehicle has been submitted and will appear after manager approval.');
@@ -100,28 +100,44 @@ function App() {
   }
 
   async function signIn(e) {
-    e.preventDefault();
-    if (!supabase) return setNotice('Connect Supabase first. See the setup guide.');
-    const f = new FormData(e.currentTarget);
-    setLoginBusy(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('manager-login', {
-        body: { username: f.get('username'), password: f.get('password') }
-      });
-      if (error || !data?.access_token || !data?.refresh_token) throw error || new Error('Login failed');
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token
-      });
-      if (sessionError) throw sessionError;
-      setNotice('Manager signed in');
-      go('manager');
-    } catch {
-      setNotice('Login failed. Check the manager username and password.');
-    } finally {
-      setLoginBusy(false);
-    }
+  e.preventDefault();
+
+  if (!supabase) {
+    return setNotice('Connect Supabase first.');
   }
+
+  const f = new FormData(e.currentTarget);
+  setLoginBusy(true);
+
+  try {
+    const { data, error } = await supabase.functions.invoke('manager-login', {
+      body: {
+        username: f.get('username'),
+        password: f.get('password')
+      }
+    });
+
+    if (error) throw error;
+
+    if (!data?.access_token || !data?.refresh_token) {
+      throw new Error(data?.error || 'Manager login failed.');
+    }
+
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token
+    });
+
+    if (sessionError) throw sessionError;
+
+    setNotice('Manager signed in');
+    go('manager');
+  } catch (error) {
+    setNotice(error.message || 'Login failed. Check your details.');
+  } finally {
+    setLoginBusy(false);
+  }
+}
 
   async function moderate(id, status) {
     const { error } = await supabase.from('vehicles').update({ status }).eq('id', id);

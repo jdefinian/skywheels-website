@@ -48,6 +48,7 @@
   grid-template-columns: 1fr 1fr !important;
   align-items: center;
   gap: 40px;
+  padding: 50px 6%;
 }
 
 .gallery-promo .promo-photo {

@@ -79,7 +79,7 @@ return { ...v, imageUrl: data?.publicUrl || null };
       for (const file of files) {
         const path = `${vehicleId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
         const { error: uploadError } = await supabase.storage.from('vehicle-photos').upload(path, file, { contentType: file.type, upsert: false });
-        if (uploadError) throw uploadError;
+        if (uploadError) throw new Error('Photo upload failed: ' + uploadError.message);
         paths.push(path);
       }
 const { error } = await supabase.from('vehicles').insert({

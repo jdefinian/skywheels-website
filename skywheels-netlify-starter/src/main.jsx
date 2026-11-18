@@ -24,7 +24,82 @@ function App() {
   const [published, setPublished] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
+  const [siteBackgrounds, setSiteBackgrounds] = useState({
+  hero: '',
+  showroom: ''
+});
 
+useEffect(() => {
+  if (!supabase) return;
+
+  async function loadSiteBackgrounds() {
+    const { data, error } = await supabase
+      .from('site_settings')
+      .select('key, value')
+      .in('key', ['hero', 'showroom']);
+
+    if (error) {
+      console.error('Could not load website backgrounds:', error);
+      return;
+    }
+
+    const backgrounds = { hero: '', showroom: '' };
+
+    data?.forEach(item => {
+      backgrounds[item.key] = item.value || '';
+    });
+
+    setSiteBackgrounds(backgrounds);
+  }
+
+  loadSiteBackgrounds();
+}, []);
+
+async function uploadBackground(type, file) {
+  if (!supabase || !file) return;
+
+  if (!file.type.startsWith('image/')) {
+    setNotice('Please select an image file.');
+    return;
+  }
+
+  if (file.size > 8 * 1024 * 1024) {
+    setNotice('Image must be smaller than 8MB.');
+    return;
+  }
+
+  try {
+    const path = `${type}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('site-backgrounds')
+      .upload(path, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('site-backgrounds')
+      .getPublicUrl(path);
+
+    const { error: saveError } = await supabase
+      .from('site_settings')
+      .upsert({ key: type, value: data.publicUrl });
+
+    if (saveError) throw saveError;
+
+    setSiteBackgrounds(previous => ({
+      ...previous,
+      [type]: data.publicUrl
+    }));
+
+    setNotice('Website background updated successfully.');
+  } catch (error) {
+    setNotice(error.message || 'Background upload failed.');
+  }
+
+  setTimeout(() => setNotice(''), 5000);
+}
+  
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 850);
     if (supabase) {
@@ -170,12 +245,12 @@ const { error } = await supabase.from('vehicles').insert({
     </header>
 
     <main>
-      {page === 'home' && <Home go={go}/>}
+      {page === 'home' && <Home go={go} siteBackgrounds={siteBackgrounds}/>}
       {page === 'gallery' && <Gallery vehicles={published} go={go} configured={!!supabase}/>}
       {page === 'submit' && <Submit onSubmit={submitVehicle} busy={submitting} configured={!!supabase}/>}
       {page === 'team' && <Team staff={staff} copyPhone={copyPhone}/>}
       {page === 'login' && <Login onSubmit={signIn} busy={loginBusy} configured={!!supabase}/>}
-      {page === 'manager' && (session ? <Manager pending={pending} published={published} moderate={moderate} remove={removeVehicle} signOut={signOut}/> : <Login onSubmit={signIn} busy={loginBusy} configured={!!supabase}/>)}
+      {page === 'manager' && (session ? <Manager pending={pending} published={published} moderate={moderate} remove={removeVehicle} signOut={signOut} siteBackgrounds={siteBackgrounds} uploadBackground={uploadBackground}/> : <Login onSubmit={signIn} busy={loginBusy} configured={!!supabase}/>)}
     </main>
 
     <footer className="footer">
@@ -186,16 +261,21 @@ const { error } = await supabase.from('vehicles').insert({
   </>;
 }
 
-function Home({ go }) {
+function Home({ go, siteBackgrounds }) {
   return <>
-    <section className="hero">
+    <section
+  className="hero"
+  style={siteBackgrounds.hero ? {
+    backgroundImage: `url("${siteBackgrounds.hero}")`
+  } : undefined}
+>
       <div className="hero-shade"/>
       <div className="hero-content"><span className="eyebrow">SKYWHEELS • AUTOMOTIVE CARE</span><h1>KEEPING YOU<br/><em>MOVING.</em></h1><p>Professional vehicle care, honest advice and a team that puts your car first.</p><div className="hero-actions"><button className="button primary" onClick={() => go('submit')}>Share your vehicle <ArrowRight size={17}/></button><button className="button ghost" onClick={() => go('gallery')}>Explore the gallery</button></div></div>
       <div className="hero-bottom"><span>CARE • CRAFT • CONFIDENCE</span><span>SCROLL TO DISCOVER <ChevronDown size={15}/></span></div>
     </section>
     <section className="intro section-wrap"><div><span className="eyebrow">WELCOME TO SKYWHEELS</span><h2>More than a<br/><em>garage.</em></h2></div><div className="intro-copy"><p className="lead">At Skywheels, we believe every vehicle deserves care, attention and the right people behind the tools.</p><p>We’re building a place where customers can discover our work, share their vehicles and get to know the people who keep them moving.</p><p className="placeholder-note">This introduction is ready to be personalised with Skywheels’ real history, location and story.</p></div></section>
     <section className="feature-band"><div className="feature"><Wrench/><h3>Skilled workmanship</h3><p>Care and attention in every job.</p></div><div className="feature"><Gauge/><h3>Customer-first service</h3><p>Clear communication at every step.</p></div><div className="feature"><ShieldCheck/><h3>Trust you can rely on</h3><p>Putting your vehicle and confidence first.</p></div></section>
-    <section className="gallery-promo"><div><span className="eyebrow">THE SKYWHEELS COMMUNITY</span><h2>YOUR CAR.<br/><em>OUR GALLERY.</em></h2><p>Show off your pride and joy. Send us your vehicle and, once approved, it could feature in our customer gallery.</p><button className="button primary" onClick={() => go('submit')}>Submit your vehicle <ArrowRight size={17}/></button></div><div className="promo-photo"/></section>
+    <section className="gallery-promo"><div><span className="eyebrow">THE SKYWHEELS COMMUNITY</span><h2>YOUR CAR.<br/><em>OUR GALLERY.</em></h2><p>Show off your pride and joy. Send us your vehicle and, once approved, it could feature in our customer gallery.</p><button className="button primary" onClick={() => go('submit')}>Submit your vehicle <ArrowRight size={17}/></button></div><div className="promo-photo" style={siteBackgrounds.showroom ? { backgroundImage: `url("${siteBackgrounds.showroom}")` } : undefined}/></section>
     <section className="cta-strip"><div><span className="eyebrow">GET TO KNOW US</span><h2>Meet the people behind Skywheels.</h2></div><button className="button ghost" onClick={() => go('team')}>Meet our team <ArrowRight size={17}/></button></section>
   </>;
 }
@@ -233,9 +313,49 @@ function Login({ onSubmit, busy, configured }) {
   </PageHero>;
 }
 
-function Manager({ pending, published, moderate, remove, signOut }) {
+function Manager({ pending, published, moderate, remove, signOut, siteBackgrounds, uploadBackground }) {
   return <PageHero eyebrow="PRIVATE MANAGEMENT" title={<>MANAGER<br/><em>DASHBOARD.</em></>} description="Review customer submissions and manage the vehicles shown in the public gallery.">
     <div className="manager-top"><div><strong>{pending.length}</strong><span>Pending review</span></div><div><strong>{published.length}</strong><span>Published vehicles</span></div><button className="button ghost" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
+    <div className="website-appearance">
+  <h3 className="admin-section-title">Website Appearance</h3>
+  <p className="placeholder-note">
+    Upload new photographs to change the backgrounds on your public website.
+  </p>
+
+  <div className="appearance-grid">
+    <div className="appearance-card">
+      <h4>Homepage hero background</h4>
+      {siteBackgrounds.hero && (
+        <img src={siteBackgrounds.hero} alt="Homepage background preview"/>
+      )}
+      <label className="button ghost">
+        <Upload size={16}/> Choose new photograph
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          onChange={e => uploadBackground('hero', e.target.files[0])}
+        />
+      </label>
+    </div>
+
+    <div className="appearance-card">
+      <h4>Showroom background</h4>
+      {siteBackgrounds.showroom && (
+        <img src={siteBackgrounds.showroom} alt="Showroom background preview"/>
+      )}
+      <label className="button ghost">
+        <Upload size={16}/> Choose new photograph
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          onChange={e => uploadBackground('showroom', e.target.files[0])}
+        />
+      </label>
+    </div>
+  </div>
+</div>
     <h3 className="admin-section-title">Awaiting approval</h3>
     {pending.length ? <div className="admin-list">{pending.map(v => <AdminVehicle key={v.id} vehicle={v} pending moderate={moderate} remove={remove}/>)}</div> : <div className="empty-state compact"><Check/><h3>All caught up</h3><p>There are no pending submissions.</p></div>}
     <h3 className="admin-section-title">Published gallery</h3>

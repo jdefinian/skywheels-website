@@ -1,125 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import { createClient } from '@supabase/supabase-js';
-import { ArrowRight, Wrench, Gauge, ShieldCheck, Menu, X, Upload, LockKeyhole, Trash2, Check, XCircle, Phone, MapPin, Clock, ChevronDown, ImagePlus, LogOut } from 'lucide-react';
-import './styles.css?v=3';
-
-const LOGO_URL = 'https://i.postimg.cc/xCpRKkKx/d5a0e7fe-0b5f-4e47-9069-1714a645ffd1-Picsart-Background-Remover.png';
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
-
-const staff = [
-  { name: 'Employee name', role: 'Mechanic', phone: '00000 000000', image: '' },
-  { name: 'Employee name', role: 'Service team', phone: '00000 000000', image: '' }
-];
-
-function App() {
-  const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [page, setPage] = useState('home');
-  const [notice, setNotice] = useState('');
-  const [session, setSession] = useState(null);
-  const [pending, setPending] = useState([]);
-  const [published, setPublished] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [loginBusy, setLoginBusy] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 850);
-    if (supabase) {
-      supabase.auth.getSession().then(({ data }) => setSession(data.session));
-      const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
-      return () => { clearTimeout(timer); listener.subscription.unsubscribe(); };
-    }
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => { loadGallery(); }, [session, page]);
-
-  async function loadGallery() {
-    if (!supabase) return;
-    const { data: live } = await supabase.from('vehicles').select('*').eq('status', 'approved').order('created_at', { ascending: false });
-    if (live) {
-      const withImages = await Promise.all(live.map(async v => {
-        const firstPath = v.image_paths?.[0];
-        if (!firstPath) return { ...v, imageUrl: null };
-        const { data } = await supabase.storage.from('vehicle-photos').createSignedUrl(firstPath, 3600);
-        return { ...v, imageUrl: data?.signedUrl || null };
-      }));
-      setPublished(withImages);
-    }
-    if (session) {
-      const { data: waiting } = await supabase.from('vehicles').select('*').eq('status', 'pending').order('created_at', { ascending: true });
-      setPending(waiting || []);
-    }
-  }
-
-  function go(to) { setPage(to); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  async function copyPhone(phone) {
-    try { await navigator.clipboard.writeText(phone); setNotice('Phone number copied to clipboard'); }
-    catch { setNotice('Please copy this number: ' + phone); }
-    setTimeout(() => setNotice(''), 2600);
-  }
-
-  async function submitVehicle(e) {
-    e.preventDefault();
-    if (!supabase) return setNotice('Website setup is not complete yet. Please try again later.');
-    const form = new FormData(e.currentTarget);
-    const files = Array.from(form.getAll('photos')).filter(f => f && f.size);
-    if (!files.length) return setNotice('Please add at least one photograph.');
-    if (files.length > 5) return setNotice('Please upload no more than five photographs.');
-    if (files.some(f => !f.type.startsWith('image/') || f.size > 8 * 1024 * 1024)) return setNotice('Images must be JPG, PNG or WebP and under 8MB each.');
-    setSubmitting(true);
-    try {
-      // Create the ID in the browser so the anonymous visitor does not need
-      // permission to read their pending row back from the database.
-      const vehicleId = crypto.randomUUID();
-      const paths = [];
-      for (const file of files) {
-        const path = `${vehicleId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
-        const { error: uploadError } = await supabase.storage.from('vehicle-photos').upload(path, file, { contentType: file.type, upsert: false });
-        if (uploadError) throw uploadError;
-        paths.push(path);
-      }
-      const { error } = await supabase.from('vehicles').insert({
-        id: vehicleId,
-        customer_name: form.get('customer_name').trim(),
-        make_model: form.get('make_model').trim(),
-        year: form.get('year') ? Number(form.get('year')) : null,
-        description: form.get('description').trim(),
-        status: 'pending',
-        image_paths: paths
-      });
-      if (error) throw error;
-      e.currentTarget.reset();
-      setNotice('Thanks! Your vehicle has been submitted and will appear after manager approval.');
-    } catch (err) {
-      setNotice(err.message || 'Sorry, your submission could not be sent.');
-    } finally { setSubmitting(false); setTimeout(() => setNotice(''), 6000); }
-  }
-
-  async function signIn(e) {
-    e.preventDefault();
-    if (!supabase) return setNotice('Connect Supabase first. See the setup guide.');
-    const f = new FormData(e.currentTarget);
-    setLoginBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: f.get('email'), password: f.get('password') });
-    setLoginBusy(false);
-    if (error) setNotice('Login failed. Check the manager account details.');
-    else { setNotice('Manager signed in'); go('manager'); }
-  }
-
-  async function moderate(id, status) {
-    const { error } = await supabase.from('vehicles').update({ status }).eq('id', id);
-    if (!error) { setNotice(status === 'approved' ? 'Vehicle approved' : 'Submission rejected'); loadGallery(); }
-    else setNotice(error.message);
-    setTimeout(() => setNotice(''), 3000);
   }
   async function removeVehicle(id) {
     if (!window.confirm('Permanently delete this vehicle and its uploaded photos?')) return;
     const item = [...pending, ...published].find(v => v.id === id);
-    if (item?.image_paths?.length) await supabase.storage.from('vehicle-photos').remove(item.image_paths);
+    if (item?.photo_paths?.length) await supabase.storage.from('vehicle-photos').remove(item.photo_paths);
     const { error } = await supabase.from('vehicles').delete().eq('id', id);
     if (!error) { setNotice('Vehicle deleted'); loadGallery(); } else setNotice(error.message);
     setTimeout(() => setNotice(''), 3000);
@@ -174,7 +57,7 @@ function Home({ go }) {
 function Gallery({ vehicles, go, configured }) {
   return <PageHero eyebrow="THE SKYWHEELS COMMUNITY" title={<>CUSTOMER<br/><em>GALLERY.</em></>} description="A showcase of the vehicles and people that make the Skywheels community special.">
     <div className="gallery-toolbar"><span>{vehicles.length} {vehicles.length === 1 ? 'VEHICLE' : 'VEHICLES'} FEATURED</span><button className="button primary" onClick={() => go('submit')}>Submit yours <ArrowRight size={16}/></button></div>
-    {!configured ? <div className="empty-state"><ImagePlus size={35}/><h3>Gallery coming soon</h3><p>The gallery will appear here once the website database is connected.</p></div> : vehicles.length ? <div className="vehicle-grid">{vehicles.map(v => <article className="vehicle-card" key={v.id}>{v.imageUrl ? <img src={v.imageUrl} alt={v.make_model}/> : <div className="vehicle-placeholder"><Wrench/></div>}<div className="vehicle-info"><span>{v.year || 'SKYWHEELS CUSTOMER'}</span><h3>{v.make_model}</h3><p>{v.description}</p></div></article>)}</div> : <div className="empty-state"><ImagePlus size={35}/><h3>Be the first to feature your vehicle</h3><p>Customer vehicles will appear here after manager approval.</p><button className="button primary" onClick={() => go('submit')}>Submit your vehicle</button></div>}
+    {!configured ? <div className="empty-state"><ImagePlus size={35}/><h3>Gallery coming soon</h3><p>The gallery will appear here once the website database is connected.</p></div> : vehicles.length ? <div className="vehicle-grid">{vehicles.map(v => <article className="vehicle-card" key={v.id}>{v.imageUrl ? <img src={v.imageUrl} alt={v.vehicle_make_model}/> : <div className="vehicle-placeholder"><Wrench/></div>}<div className="vehicle-info"><span>{v.vehicle_year || 'SKYWHEELS CUSTOMER'}</span><h3>{v.vehicle_make_model}</h3><p>{v.description}</p></div></article>)}</div> : <div className="empty-state"><ImagePlus size={35}/><h3>Be the first to feature your vehicle</h3><p>Customer vehicles will appear here after manager approval.</p><button className="button primary" onClick={() => go('submit')}>Submit your vehicle</button></div>}
   </PageHero>;
 }
 
@@ -200,7 +83,7 @@ function Team({ staff, copyPhone }) {
 
 function Login({ onSubmit, busy, configured }) {
   return <PageHero eyebrow="RESTRICTED ACCESS" title={<>MANAGER<br/><em>LOGIN.</em></>} description="The private Skywheels management area. Access is reserved for authorised managers.">
-    <form className="login-card" onSubmit={onSubmit}><div className="login-icon"><LockKeyhole/></div><h3>Manager access</h3><label>Email address<input name="email" type="email" autoComplete="username" required placeholder="Manager email"/></label><label>Password<input name="password" type="password" autoComplete="current-password" required placeholder="Password"/></label><button className="button primary submit-button" disabled={busy || !configured}>{busy ? 'Signing in…' : 'Sign in securely'} <ArrowRight size={17}/></button>{!configured && <p className="setup-warning">Manager login becomes available after Supabase is configured.</p>}</form>
+    <form className="login-card" onSubmit={onSubmit}><div className="login-icon"><LockKeyhole/></div><h3>Manager access</h3><label>Username<input name="username" type="text" autoComplete="username" required placeholder="manager.skywheels" defaultValue="manager.skywheels"/></label><label>Password<input name="password" type="password" autoComplete="current-password" required placeholder="Password"/></label><button className="button primary submit-button" disabled={busy || !configured}>{busy ? 'Signing in…' : 'Sign in securely'} <ArrowRight size={17}/></button>{!configured && <p className="setup-warning">Manager login becomes available after Supabase is configured.</p>}</form>
   </PageHero>;
 }
 
@@ -215,7 +98,7 @@ function Manager({ pending, published, moderate, remove, signOut }) {
 }
 
 function AdminVehicle({ vehicle, pending, moderate, remove }) {
-  return <article className="admin-vehicle"><div className="admin-vehicle-main"><div className="admin-thumb"><Wrench/></div><div><h4>{vehicle.make_model}</h4><p>{vehicle.customer_name} {vehicle.year ? `• ${vehicle.year}` : ''}</p><small>{vehicle.description || 'No description provided'}</small></div></div><div className="admin-actions">{pending && <><button className="icon-action approve" title="Approve" onClick={() => moderate(vehicle.id, 'approved')}><Check/></button><button className="icon-action reject" title="Reject" onClick={() => moderate(vehicle.id, 'rejected')}><XCircle/></button></>}<button className="icon-action delete" title="Delete" onClick={() => remove(vehicle.id)}><Trash2/></button></div></article>;
+  return <article className="admin-vehicle"><div className="admin-vehicle-main"><div className="admin-thumb"><Wrench/></div><div><h4>{vehicle.vehicle_make_model}</h4><p>{vehicle.customer_name} {vehicle.vehicle_year ? `• ${vehicle.vehicle_year}` : ''}</p><small>{vehicle.description || 'No description provided'}</small></div></div><div className="admin-actions">{pending && <><button className="icon-action approve" title="Approve" onClick={() => moderate(vehicle.id, 'approved')}><Check/></button><button className="icon-action reject" title="Reject" onClick={() => moderate(vehicle.id, 'rejected')}><XCircle/></button></>}<button className="icon-action delete" title="Delete" onClick={() => remove(vehicle.id)}><Trash2/></button></div></article>;
 }
 
 function PageHero({ eyebrow, title, description, children }) {

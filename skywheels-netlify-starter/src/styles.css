@@ -41,3 +41,25 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Restore showroom side-by-side layout */
+.gallery-promo {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  align-items: center;
+  gap: 40px;
+}
+
+.gallery-promo .promo-photo {
+  width: 100%;
+  min-height: 420px;
+  background-size: contain !important;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (max-width: 768px) {
+  .gallery-promo {
+    grid-template-columns: 1fr !important;
+  }
+}

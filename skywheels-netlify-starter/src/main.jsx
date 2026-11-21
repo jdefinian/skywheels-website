@@ -387,6 +387,12 @@ function Manager({ pending, published, moderate, remove, signOut, siteBackground
     </div>
   </div>
 </div>
+        <div className="employee-management">
+      <h3 className="admin-section-title">Employee Management</h3>
+      <p className="placeholder-note">
+        Manage the team members displayed on your public website.
+      </p>
+    </div>
     <h3 className="admin-section-title">Awaiting approval</h3>
     {pending.length ? <div className="admin-list">{pending.map(v => <AdminVehicle key={v.id} vehicle={v} pending moderate={moderate} remove={remove}/>)}</div> : <div className="empty-state compact"><Check/><h3>All caught up</h3><p>There are no pending submissions.</p></div>}
     <h3 className="admin-section-title">Published gallery</h3>

@@ -274,12 +274,12 @@ function Home({ go, siteBackgrounds }) {
       <div className="hero-bottom"><span>CARE • CRAFT • CONFIDENCE</span><span>SCROLL TO DISCOVER <ChevronDown size={15}/></span></div>
     </section>
     <section className="intro section-wrap"><div><span className="eyebrow">WELCOME TO SKYWHEELS</span><h2>More than a<br/><em>garage.</em></h2></div><div className="intro-copy">
-  <p className="lead">
-    Skywheels began its journey as Flywheels, a garage located beside Sandy Shores Airport. I originally joined the business simply looking for a way to earn an income.
+  
+    <h3>Skywheels began its journey as Flywheels</h3>
   </p>
 
   <p>
-    As time went on, I noticed there were plenty of people looking for work, but the owner was rarely around. I reached out and asked whether I could bring some new people into the business. He explained that he no longer had the time to look after the place properly and, to my surprise, asked if I wanted to take it over.
+    A garage located beside Sandy Shores Airport. I originally joined the business simply looking for a way to earn an income.As time went on, I noticed there were plenty of people looking for work, but the owner was rarely around. I reached out and asked whether I could bring some new people into the business. He explained that he no longer had the time to look after the place properly and, to my surprise, asked if I wanted to take it over.
   </p>
 
   <p>

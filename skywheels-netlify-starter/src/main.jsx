@@ -274,8 +274,9 @@ function Home({ go, siteBackgrounds }) {
       <div className="hero-bottom"><span>CARE • CRAFT • CONFIDENCE</span><span>SCROLL TO DISCOVER <ChevronDown size={15}/></span></div>
     </section>
     <section className="intro section-wrap"><div><span className="eyebrow">WELCOME TO SKYWHEELS</span><h2>More than a<br/><em>garage.</em></h2></div><div className="intro-copy">
-  
-    <h3>Skywheels began its journey as Flywheels</h3>
+
+  <p>
+  <h3>Skywheels began its journey as Flywheels</h3>
   </p>
 
   <p>

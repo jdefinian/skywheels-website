@@ -273,7 +273,37 @@ function Home({ go, siteBackgrounds }) {
       <div className="hero-content"><span className="eyebrow">SKYWHEELS • AUTOMOTIVE CARE</span><h1>KEEPING YOU<br/><em>MOVING.</em></h1><p>Professional vehicle care, honest advice and a team that puts your car first.</p><div className="hero-actions"><button className="button primary" onClick={() => go('submit')}>Share your vehicle <ArrowRight size={17}/></button><button className="button ghost" onClick={() => go('gallery')}>Explore the gallery</button></div></div>
       <div className="hero-bottom"><span>CARE • CRAFT • CONFIDENCE</span><span>SCROLL TO DISCOVER <ChevronDown size={15}/></span></div>
     </section>
-    <section className="intro section-wrap"><div><span className="eyebrow">WELCOME TO SKYWHEELS</span><h2>More than a<br/><em>garage.</em></h2></div><div className="intro-copy"><p className="lead">At Skywheels, we believe every vehicle deserves care, attention and the right people behind the tools.</p><p>We’re building a place where customers can discover our work, share their vehicles and get to know the people who keep them moving.</p><p className="placeholder-note">This introduction is ready to be personalised with Skywheels’ real history, location and story.</p></div></section>
+    <section className="intro section-wrap"><div><span className="eyebrow">WELCOME TO SKYWHEELS</span><h2>More than a<br/><em>garage.</em></h2></div><div className="intro-copy">
+  <p className="lead">
+    Skywheels began its journey as Flywheels, a garage located beside Sandy Shores Airport. I originally joined the business simply looking for a way to earn an income.
+  </p>
+
+  <p>
+    As time went on, I noticed there were plenty of people looking for work, but the owner was rarely around. I reached out and asked whether I could bring some new people into the business. He explained that he no longer had the time to look after the place properly and, to my surprise, asked if I wanted to take it over.
+  </p>
+
+  <p>
+    I was hesitant at first, but decided to take the opportunity. Just like that, Flywheels became mine, completely free of charge! In June 2022, I received approval for the premises licence.
+  </p>
+
+  <h3>A new name, a new chapter</h3>
+  <p>
+    With encouragement from friends and family, I eventually decided it was time for a name change. Despite what some might think, Skywheels wasn't named after me. The name was inspired by its original location right beside the airport.
+  </p>
+
+  <h3>Finding our home</h3>
+  <p>
+    When plans to redevelop Sandy Shores Airport meant the garage had to move, we relocated to the western side of Sandy Shores. Then, in 2026, another town improvement project meant another move was needed. Once again, we embraced the change. Today, this is where Skywheels calls home.
+  </p>
+
+  <h3>And we're just getting started.</h3>
+  <p>
+    I've been proud to serve Sandy Shores as a business owner and mechanic for over four years. I'm grateful for everyone who has been part of the journey, and I have no plans of going anywhere anytime soon.
+  </p>
+
+  <p><strong>— Skyler Mercer</strong></p>
+</div>
+</section>
     <section className="feature-band"><div className="feature"><Wrench/><h3>Skilled workmanship</h3><p>Care and attention in every job.</p></div><div className="feature"><Gauge/><h3>Customer-first service</h3><p>Clear communication at every step.</p></div><div className="feature"><ShieldCheck/><h3>Trust you can rely on</h3><p>Putting your vehicle and confidence first.</p></div></section>
     <section className="gallery-promo"><div><span className="eyebrow">THE SKYWHEELS COMMUNITY</span><h2>YOUR CAR.<br/><em>OUR GALLERY.</em></h2><p>Show off your pride and joy. Send us your vehicle and, once approved, it could feature in our customer gallery.</p><button className="button primary" onClick={() => go('submit')}>Submit your vehicle <ArrowRight size={17}/></button></div><div className="promo-photo" style={siteBackgrounds.showroom ? { backgroundImage: `url("${siteBackgrounds.showroom}")`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}/></section>
     <section className="cta-strip"><div><span className="eyebrow">GET TO KNOW US</span><h2>Meet the people behind Skywheels.</h2></div><button className="button ghost" onClick={() => go('team')}>Meet our team <ArrowRight size={17}/></button></section>

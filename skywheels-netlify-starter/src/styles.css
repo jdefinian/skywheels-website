@@ -64,3 +64,18 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Show full employee photographs without cropping */
+.team-photo {
+  height: auto;
+  aspect-ratio: auto;
+  overflow: hidden;
+  background: #16191d;
+}
+
+.team-photo img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}

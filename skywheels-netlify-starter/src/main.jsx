@@ -9,10 +9,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
-const staff = [
-  { name: 'Employee name', role: 'Mechanic', phone: '00000 000000', image: '' },
-  { name: 'Employee name', role: 'Service team', phone: '00000 000000', image: '' }
-];
+
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -22,6 +19,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [pending, setPending] = useState([]);
   const [published, setPublished] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
   const [siteBackgrounds, setSiteBackgrounds] = useState({
@@ -110,7 +108,10 @@ async function uploadBackground(type, file) {
     return () => clearTimeout(timer);
   }, []);
 
-  useEffect(() => { loadGallery(); }, [session, page]);
+  useEffect(() => {
+  loadGallery();
+  loadEmployees();
+}, [session, page]);
 
   async function loadGallery() {
     if (!supabase) return;
@@ -130,9 +131,25 @@ return { ...v, imageUrl: data?.publicUrl || null };
     }
   }
 
+async function loadEmployees() {
+  if (!supabase) return;
+
+  const { data, error } = await supabase
+    .from('employees')
+    .select('*')
+    .order('display_order', { ascending: true });
+
+  if (error) {
+    console.error('Error loading employees:', error);
+    return;
+  }
+
+  setEmployees(data || []);
+}
+  
   function go(to) { setPage(to); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   async function copyPhone(phone) {
-    try { await navigator.clipboard.writeText(phone); setNotice('Phone number copied to clipboard'); }
+    try { await navigator.clipboard.writeText(phone); setNotice('Phone number copied!'); }
     catch { setNotice('Please copy this number: ' + phone); }
     setTimeout(() => setNotice(''), 2600);
   }
@@ -228,6 +245,96 @@ const { error } = await supabase.from('vehicles').insert({
     if (!error) { setNotice('Vehicle deleted'); loadGallery(); } else setNotice(error.message);
     setTimeout(() => setNotice(''), 3000);
   }
+
+    async function saveEmployee(formData, employeeId) {
+    if (!supabase) return setNotice('Database connection unavailable.');
+
+    try {
+            let photoPath = formData.photo_path || null;
+
+      if (formData.photoFile) {
+        const file = formData.photoFile;
+
+        if (!file.type.startsWith('image/') || file.size > 8 * 1024 * 1024) {
+          throw new Error('Please choose an image smaller than 8MB.');
+        }
+
+        const path = `${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('employee-photos')
+          .upload(path, file, { contentType: file.type });
+
+        if (uploadError) throw uploadError;
+
+        photoPath = path;
+      }
+      const employee = {
+        name: formData.name.trim(),
+        job_title: formData.job_title.trim(),
+        phone: formData.phone.trim(),
+        photo_path: photoPath,
+        display_order: Number(formData.display_order) || 0,
+        is_active: formData.is_active
+      };
+
+      let result;
+
+      if (employeeId) {
+        result = await supabase
+          .from('employees')
+          .update(employee)
+          .eq('id', employeeId);
+      } else {
+        result = await supabase
+          .from('employees')
+          .insert(employee);
+      }
+
+      if (result.error) throw result.error;
+
+      await loadEmployees();
+      setNotice(employeeId ? 'Employee updated.' : 'Employee added.');
+    } catch (error) {
+      setNotice(error.message || 'Could not save employee.');
+    }
+
+    setTimeout(() => setNotice(''), 4000);
+  }
+
+async function removeEmployee(person) {
+  if (!supabase) return;
+
+  const confirmed = window.confirm(`Delete ${person.name} from the team?`);
+  if (!confirmed) return;
+
+  try {
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('id', person.id);
+
+    if (error) throw error;
+
+    if (person.photo_path) {
+      const { error: photoError } = await supabase.storage
+        .from('employee-photos')
+        .remove([person.photo_path]);
+
+      if (photoError) console.error('Could not delete employee photo:', photoError);
+    }
+
+    await loadEmployees();
+    setNotice('Employee deleted.');
+  } catch (error) {
+    setNotice(error.message || 'Could not delete employee.');
+  }
+
+  setTimeout(() => setNotice(''), 4000);
+}
+
+  
+  
   async function signOut() { await supabase.auth.signOut(); go('home'); }
 
   if (loading) return <div className="loader"><img src={LOGO_URL} alt="Skywheels" /><div className="loader-line"><span /></div></div>;
@@ -248,9 +355,23 @@ const { error } = await supabase.from('vehicles').insert({
       {page === 'home' && <Home go={go} siteBackgrounds={siteBackgrounds}/>}
       {page === 'gallery' && <Gallery vehicles={published} go={go} configured={!!supabase}/>}
       {page === 'submit' && <Submit onSubmit={submitVehicle} busy={submitting} configured={!!supabase}/>}
-      {page === 'team' && <Team staff={staff} copyPhone={copyPhone}/>}
+      {page === 'team' && (
+  <Team
+    staff={employees
+      .filter(person => person.is_active)
+      .map(person => ({
+        name: person.name,
+        role: person.job_title,
+        phone: person.phone,
+        image: person.photo_path
+          ? supabase.storage.from('employee-photos').getPublicUrl(person.photo_path).data.publicUrl
+          : ''
+      }))}
+    copyPhone={copyPhone}
+  />
+)}
       {page === 'login' && <Login onSubmit={signIn} busy={loginBusy} configured={!!supabase}/>}
-      {page === 'manager' && (session ? <Manager pending={pending} published={published} moderate={moderate} remove={removeVehicle} signOut={signOut} siteBackgrounds={siteBackgrounds} uploadBackground={uploadBackground}/> : <Login onSubmit={signIn} busy={loginBusy} configured={!!supabase}/>)}
+      {page === 'manager' && (session ? <Manager pending={pending} published={published} employees={employees} removeEmployee={removeEmployee} setEmployees={setEmployees} saveEmployee={saveEmployee} moderate={moderate} remove={removeVehicle} signOut={signOut} siteBackgrounds={siteBackgrounds} uploadBackground={uploadBackground}/> : <Login onSubmit={signIn} busy={loginBusy} configured={!!supabase}/>)}
     </main>
 
     <footer className="footer">
@@ -334,7 +455,6 @@ function Submit({ onSubmit, busy, configured }) {
 function Team({ staff, copyPhone }) {
   return <PageHero eyebrow="THE PEOPLE BEHIND THE WORK" title={<>MEET THE<br/><em>TEAM.</em></>} description="Get to know the people who help keep Skywheels moving.">
     <div className="team-grid">{staff.map((person, i) => <article className="team-card" key={i}><div className="team-photo">{person.image ? <img src={person.image} alt={person.name}/> : <div className="team-initial">{person.name.split(' ').map(x => x[0]).join('')}</div>}</div><div className="team-info"><span>{person.role}</span><h3>{person.name}</h3><button className="phone-copy" onClick={() => copyPhone(person.phone)}><Phone size={15}/>{person.phone}<span>Copy number</span></button></div></article>)}</div>
-    <p className="placeholder-note team-note">Replace the sample names and numbers in <code>src/main.jsx</code> with your real team details and add their photo URLs.</p>
   </PageHero>;
 }
 
@@ -344,7 +464,8 @@ function Login({ onSubmit, busy, configured }) {
   </PageHero>;
 }
 
-function Manager({ pending, published, moderate, remove, signOut, siteBackgrounds, uploadBackground }) {
+function Manager({ pending, published, employees, removeEmployee, setEmployees, saveEmployee, moderate, remove, signOut, siteBackgrounds, uploadBackground }) {
+    const [editingEmployee, setEditingEmployee] = useState(null);
   return <PageHero eyebrow="PRIVATE MANAGEMENT" title={<>MANAGER<br/><em>DASHBOARD.</em></>} description="Review customer submissions and manage the vehicles shown in the public gallery.">
     <div className="manager-top"><div><strong>{pending.length}</strong><span>Pending review</span></div><div><strong>{published.length}</strong><span>Published vehicles</span></div><button className="button ghost" onClick={signOut}><LogOut size={16}/> Sign out</button></div>
     <div className="website-appearance">
@@ -389,9 +510,191 @@ function Manager({ pending, published, moderate, remove, signOut, siteBackground
 </div>
         <div className="employee-management">
       <h3 className="admin-section-title">Employee Management</h3>
-      <p className="placeholder-note">
-        Manage the team members displayed on your public website.
-      </p>
+                <form
+        className="form-card"
+        onSubmit={e => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          const photo = f.get('photo');
+
+          saveEmployee({
+            name: f.get('name'),
+            job_title: f.get('job_title'),
+            phone: f.get('phone'),
+            display_order: f.get('display_order'),
+            is_active: f.get('is_active') === 'on',
+            photo_path: null,
+            photoFile: photo?.size ? photo : null
+          }, null);
+
+          e.currentTarget.reset();
+        }}
+      >
+        <div className="form-heading">
+          <h3>Add a team member</h3>
+          <span>Enter their details below</span>
+        </div>
+
+        <div className="form-grid">
+          <label>
+            Employee name *
+            <input name="name" required maxLength="100"/>
+          </label>
+
+          <label>
+            Job title *
+            <input name="job_title" required maxLength="100"/>
+          </label>
+
+          <label>
+            Phone number
+            <input name="phone" type="tel" maxLength="30"/>
+          </label>
+
+          <label>
+            Display order
+            <input name="display_order" type="number" defaultValue="0"/>
+          </label>
+
+          <label className="full upload-label">
+            Profile photograph
+            <input name="photo" type="file" accept="image/jpeg,image/png,image/webp"/>
+          </label>
+
+          <label className="consent full">
+            <input name="is_active" type="checkbox" defaultChecked/>
+            Display this employee on the public website
+          </label>
+        </div>
+
+        <button className="button primary submit-button" type="submit">
+          Add employee <ArrowRight size={17}/>
+        </button>
+      </form>
+                <h3 className="admin-section-title">Current team members</h3>
+
+      {employees.length === 0 ? (
+        <p className="placeholder-note">No employees have been added yet.</p>
+      ) : (
+        <div className="admin-list">
+          {employees.map(person => {
+            const photoUrl = person.photo_path
+              ? supabase.storage
+                  .from('employee-photos')
+                  .getPublicUrl(person.photo_path).data.publicUrl
+              : null;
+
+            return (
+              <article className="admin-vehicle" key={person.id}>
+                <div className="admin-vehicle-main">
+                  <div className="admin-thumb">
+                    {photoUrl
+                      ? <img src={photoUrl} alt={person.name}/>
+                      : <Wrench/>
+                    }
+                  </div>
+                  <div>
+                    <h4>{person.name}</h4>
+                    <p>{person.job_title}</p>
+                    <small>{person.phone || 'No phone number added'}</small>
+                    <small>{person.is_active ? 'Visible on website' : 'Hidden from website'}</small>
+                    <button
+  className="button ghost"
+  type="button"
+  onClick={() => saveEmployee({
+    name: person.name,
+    job_title: person.job_title,
+    phone: person.phone || '',
+    display_order: person.display_order,
+    is_active: !person.is_active,
+    photo_path: person.photo_path,
+    photoFile: null
+  }, person.id)}
+>
+  {person.is_active ? 'Hide from website' : 'Show on website'}
+</button>
+ <div className="admin-actions">
+  <button
+    className="button danger"
+    type="button"
+    onClick={() => removeEmployee(person)}
+  >
+    <Trash2 size={16}/> Delete
+  </button>
+</div>
+
+<button
+  className="button ghost"
+  type="button"
+  onClick={() => setEditingEmployee(person)}
+>
+  Edit details
+</button>
+
+{editingEmployee?.id === person.id && (
+  <form
+    className="form-card"
+    onSubmit={e => {
+      e.preventDefault();
+      const f = new FormData(e.currentTarget);
+      const photo = f.get('photo');
+
+      saveEmployee({
+        name: f.get('name'),
+        job_title: f.get('job_title'),
+        phone: f.get('phone'),
+        display_order: f.get('display_order'),
+        is_active: f.get('is_active') === 'on',
+        photo_path: person.photo_path,
+        photoFile: photo?.size ? photo : null
+      }, person.id);
+
+      setEditingEmployee(null);
+    }}
+  >
+    <div className="form-grid">
+      <label>
+        Employee name *
+        <input name="name" required defaultValue={person.name}/>
+      </label>
+
+      <label>
+        Job title *
+        <input name="job_title" required defaultValue={person.job_title}/>
+      </label>
+
+      <label>
+        Phone number
+        <input name="phone" type="tel" defaultValue={person.phone || ''}/>
+      </label>
+
+      <label>
+        Display order
+        <input name="display_order" type="number" defaultValue={person.display_order}/>
+      </label>
+
+      <label className="full upload-label">
+        Change photograph
+        <input name="photo" type="file" accept="image/jpeg,image/png,image/webp"/>
+      </label>
+
+      <label className="consent full">
+        <input name="is_active" type="checkbox" defaultChecked={person.is_active}/>
+        Display this employee on the public website
+      </label>
+    </div>
+
+    <button className="button primary" type="submit">Save changes</button>
+    <button className="button ghost" type="button" onClick={() => setEditingEmployee(null)}>Cancel</button>
+  </form>
+)}         
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
     <h3 className="admin-section-title">Awaiting approval</h3>
     {pending.length ? <div className="admin-list">{pending.map(v => <AdminVehicle key={v.id} vehicle={v} pending moderate={moderate} remove={remove}/>)}</div> : <div className="empty-state compact"><Check/><h3>All caught up</h3><p>There are no pending submissions.</p></div>}
